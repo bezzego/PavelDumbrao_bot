@@ -1,0 +1,298 @@
+import sqlite3
+
+# Global database connection object
+conn: sqlite3.Connection = None
+
+
+def init_db(db_path: str = "database.db"):
+    """Initialize the SQLite database, creating tables if they do not exist."""
+    global conn
+    conn = sqlite3.connect(db_path, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+
+    # Create users table
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            user_id INTEGER PRIMARY KEY,
+            username TEXT,
+            first_name TEXT,
+            last_name TEXT,
+            points INTEGER DEFAULT 0,
+            premium INTEGER DEFAULT 0,
+            invited_by INTEGER,
+            ref_bonus_given INTEGER DEFAULT 0,
+            challenge_progress INTEGER DEFAULT 0
+        )
+        """
+    )
+    # Create index on invited_by for faster queries (optional)
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_invited_by ON users(invited_by)")
+
+    # Create payments table for pending YooMoney payments
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS payments (
+            label TEXT PRIMARY KEY,
+            user_id INTEGER,
+            amount INTEGER,
+            status TEXT DEFAULT 'pending',
+            created_at TEXT
+        )
+        """
+    )
+
+    # Create table for storing one-time promo codes
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS promo_codes (
+            code TEXT PRIMARY KEY,
+            user_id INTEGER,
+            type TEXT,
+            used INTEGER DEFAULT 0
+        )
+        """
+    )
+
+    # Create table for storing video file_ids by lesson index
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS lessons_files (
+            lesson_index INTEGER PRIMARY KEY,
+            file_id TEXT
+        )
+        """
+    )
+
+    conn.commit()
+
+
+def add_user(
+    user_id: int,
+    username: str = None,
+    first_name: str = None,
+    last_name: str = None,
+    invited_by: int = None,
+) -> bool:
+    """
+    Add a new user to the database. If user already exists, update username and names.
+    If invited_by is provided for a new user, store it.
+    Returns True if a new user was added, False if user already existed.
+    """
+    cur = conn.cursor()
+    cur.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,))
+    row = cur.fetchone()
+    if row:
+        # User exists, update username and name info just in case
+        cur.execute(
+            "UPDATE users SET username=?, first_name=?, last_name=? WHERE user_id=?",
+            (username, first_name, last_name, user_id),
+        )
+        conn.commit()
+        return False
+
+    # Insert new user
+    cur.execute(
+        "INSERT INTO users (user_id, username, first_name, last_name, invited_by) VALUES (?, ?, ?, ?, ?)",
+        (user_id, username, first_name, last_name, invited_by),
+    )
+    conn.commit()
+    return True
+
+
+def get_user(user_id: int):
+    """Retrieve user record by user_id. Returns a dict with user fields or None if not found."""
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+    row = cur.fetchone()
+    if row:
+        return dict(row)
+    return None
+
+
+def update_points(user_id: int, delta: int):
+    """Add or subtract points for a user by delta amount."""
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE users SET points = points + ? WHERE user_id = ?", (delta, user_id)
+    )
+    conn.commit()
+
+
+def set_points(user_id: int, points: int):
+    """Set points for a user to an absolute value."""
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET points = ? WHERE user_id = ?", (points, user_id))
+    conn.commit()
+
+
+def set_premium(user_id: int, premium: bool):
+    """Set premium status for a user."""
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE users SET premium = ? WHERE user_id = ?", (1 if premium else 0, user_id)
+    )
+    conn.commit()
+
+
+def increment_progress(user_id: int):
+    """Increment the challenge progress of a user by 1 (for completing a code word)."""
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE users SET challenge_progress = challenge_progress + 1 WHERE user_id = ?",
+        (user_id,),
+    )
+    conn.commit()
+
+
+def set_ref_bonus_given(user_id: int):
+    """Mark that referral bonus has been given for this user."""
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET ref_bonus_given = 1 WHERE user_id = ?", (user_id,))
+    conn.commit()
+
+
+def get_top_users(limit: int = 10):
+    """Get top users by points. Returns list of tuples (user_id, username, first_name, points)."""
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT user_id, username, first_name, points FROM users ORDER BY points DESC LIMIT ?",
+        (limit,),
+    )
+    rows = cur.fetchall()
+    return [tuple(row) for row in rows] if rows else []
+
+
+def get_user_count() -> int:
+    """Return total number of users."""
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM users")
+    count = cur.fetchone()[0]
+    return count
+
+
+def get_premium_count() -> int:
+    """Return number of premium users."""
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM users WHERE premium = 1")
+    count = cur.fetchone()[0]
+    return count
+
+
+def get_referral_count() -> int:
+    """Return total number of successful referrals (users who were invited by someone)."""
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM users WHERE invited_by IS NOT NULL")
+    count = cur.fetchone()[0]
+    return count
+
+
+def add_payment(label: str, user_id: int, amount: int):
+    """Add a new pending payment record."""
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT OR REPLACE INTO payments (label, user_id, amount, status, created_at) VALUES (?, ?, ?, 'pending', datetime('now'))",
+        (label, user_id, amount),
+    )
+    conn.commit()
+
+
+def set_payment_status(label: str, status: str):
+    """Update status of a payment (e.g., 'paid' or 'expired')."""
+    cur = conn.cursor()
+    cur.execute("UPDATE payments SET status = ? WHERE label = ?", (status, label))
+    conn.commit()
+
+
+def get_pending_payments():
+    """Get all pending payments records."""
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT label, user_id, amount, created_at FROM payments WHERE status = 'pending'"
+    )
+    rows = cur.fetchall()
+    return [tuple(row) for row in rows] if rows else []
+
+
+def delete_user(user_id: int):
+    """Delete a user from the database."""
+    cur = conn.cursor()
+    cur.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+    conn.commit()
+
+
+# --- New functions for lessons_files table ---
+def get_lesson_file_id(lesson_index: int) -> str | None:
+    """
+    Retrieve stored file_id for a given lesson index.
+    Returns the file_id string if it exists, or None otherwise.
+    """
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT file_id FROM lessons_files WHERE lesson_index = ?", (lesson_index,)
+    )
+    row = cur.fetchone()
+    return row[0] if row else None
+
+
+def set_lesson_file_id(lesson_index: int, file_id: str) -> None:
+    """
+    Insert or update the file_id for a given lesson index.
+    """
+    cur = conn.cursor()
+    # Check if a record for this lesson_index already exists
+    existing = get_lesson_file_id(lesson_index)
+    if existing is None:
+        # Insert new record
+        cur.execute(
+            "INSERT INTO lessons_files (lesson_index, file_id) VALUES (?, ?)",
+            (lesson_index, file_id),
+        )
+    else:
+        # Update existing record
+        cur.execute(
+            "UPDATE lessons_files SET file_id = ? WHERE lesson_index = ?",
+            (file_id, lesson_index),
+        )
+    conn.commit()
+
+
+# --- Promo code functions ---
+def add_promo_code(code: str, user_id: int, code_type: str) -> None:
+    """
+    Store a new promo code (randomly generated) for a user and given type (e.g., 'top2', 'top3').
+    """
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO promo_codes (code, user_id, type, used) VALUES (?, ?, ?, 0)",
+        (code, user_id, code_type),
+    )
+    conn.commit()
+
+
+def get_promo(code: str):
+    """
+    Retrieve a promo record by its code. Returns a dict with keys ('code', 'user_id', 'type', 'used') or None.
+    """
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM promo_codes WHERE code = ?", (code,))
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+
+def mark_promo_used(code: str) -> None:
+    """
+    Mark a promo code as used.
+    """
+    cur = conn.cursor()
+    cur.execute("UPDATE promo_codes SET used = 1 WHERE code = ?", (code,))
+    conn.commit()
+
+
+# Alias for get_promo
+def get_promo_code(code: str):
+    """
+    Alias for get_promo, returns promo record by its code.
+    """
+    return get_promo(code)
