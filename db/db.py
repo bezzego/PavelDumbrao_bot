@@ -296,3 +296,11 @@ def get_promo_code(code: str):
     Alias for get_promo, returns promo record by its code.
     """
     return get_promo(code)
+
+def reset_top_statuses():
+    """
+    Сброс премиум статусов для топов (top1, top2, top3) в начале месяца.
+    """
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET premium = 0 WHERE premium IN ('top1', 'top2', 'top3')")
+    conn.commit()
