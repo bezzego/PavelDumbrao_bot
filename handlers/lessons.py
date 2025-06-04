@@ -613,10 +613,12 @@ async def code_word_handler(message: types.Message):
                 parse_mode="Markdown",
             )
 
-            db.update_points(user_id, 10)
+            db.update_points(user_id, 40)
             db.increment_progress(user_id)
         else:
-            # If that was the last lesson
+            # If that was the last lesson, award points and increment progress
+            db.update_points(user_id, 40)
+            db.increment_progress(user_id)
             await message.answer("🎉 Поздравляем! Вы прошли все 7 уроков челленджа.")
 
     else:

@@ -474,9 +474,13 @@ async def cmd_balance(message: types.Message):
     cur.execute("SELECT COUNT(*) FROM users WHERE invited_by = ?", (user_id,))
     referral_count = cur.fetchone()[0]
     remaining = 5 - referral_count
+    # Calculate lesson-based points: each lesson gives 40 points
+    lesson_point = challenge_progress * 40
+    # Total possible lesson points
+    max_lesson_points = len(lessons.LESSON_TEXTS) * 40
     text = (
-        f"*💼 Твой баланс:* {points} баллов\n\n"
-        f"*Прогресс по челленджу:* {points} / 250\n"
+        f"*💼 Общие баллы:* {points} баллов\n\n"
+        f"*Баллы за уроки:* {lesson_point} / {max_lesson_points}\n"
         f"*Приглашено друзей:* {referral_count} / 5\n\n"
         f"Хочешь в AI-клуб бесплатно? Осталось пригласить *{remaining}* человек.\n\n"
     )
