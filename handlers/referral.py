@@ -9,6 +9,7 @@ router = Router()
 @router.message(Command("invite"))
 async def cmd_invite(message: types.Message):
     user_id = message.from_user.id
+    # Уникальный ID пользователя используется для отслеживания приглашений
     # Generate referral link with user's id
     bot_username = config.BOT_USERNAME
     ref_link = f"https://t.me/{bot_username}?start={user_id}"
@@ -26,6 +27,7 @@ async def cmd_invite(message: types.Message):
 async def cmd_friends(message: types.Message):
     user_id = message.from_user.id
     cur = db.conn.cursor()
+    # Подсчитываем количество пользователей, приглашённых этим пользователем
     cur.execute(
         "SELECT COUNT(*) FROM users WHERE invited_by = ?",
         (user_id,),
