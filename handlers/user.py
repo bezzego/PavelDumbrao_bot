@@ -231,12 +231,19 @@ async def callback_check_sub(callback: types.CallbackQuery):
         first_name=user.first_name,
         last_name=user.last_name,
     )
-    # Referral bonus logic
+    # Referral bonus logic (grant once per invited user)
     user_data = db.get_user(user_id)
-    inviter_id = user_data.get("invited_by") if user_data else None
-    if inviter_id:
-        # Add 50 points to inviter
+    if user_data:
+        inviter_id = user_data.get("invited_by")
+        ref_given = user_data.get("ref_bonus_given", 0)
+    else:
+        inviter_id = None
+        ref_given = 0
+
+    if inviter_id and ref_given == 0:
+        # Add 50 points to inviter and mark bonus as given
         db.update_points(inviter_id, 50)
+        db.set_ref_bonus_given(user_id)
         # Calculate number of referrals
         cur = db.conn.cursor()
         cur.execute("SELECT COUNT(*) FROM users WHERE invited_by = ?", (inviter_id,))
@@ -295,20 +302,22 @@ async def callback_check_sub(callback: types.CallbackQuery):
             # Subsequent invite message
             remaining = 5 - referral_count
             text = (
-                f"💥 Новый участник по твоей ссылке: {display_name}\n"
+                f"💥 *Новый участник по твоей ссылке:* {display_name}\n"
                 f"+50 баллов!\n"
-                f"Всего: {inviter_points} баллов\n\n"
-                f"Осталось ещё {remaining} друзей до клуба без оплаты!\n\n"
-                f"Промежуточный прогресс:\n"
-                f"🔄 Прогресс:\n\n"
-                f"Ты набрал: {inviter_points} из 500\n"
-                f"Челлендж: {challenge_progress} / 250\n"
-                f"Рефералы: {referral_count} / 250\n\n"
+                f"*Всего:* {inviter_points} баллов\n\n"
+                f"Осталось ещё *{remaining}* друзей до клуба без оплаты!\n\n"
+                f"*Промежуточный прогресс:*\n"
+                f"🔄 *Прогресс:*\n\n"
+                f"*Ты набрал:* {inviter_points} из 500\n"
+                f"*Челлендж:* {challenge_progress} / 250\n"
+                f"*Рефералы:* {referral_count} / 5\n\n"
                 "Всё идёт по плану — продолжай!"
             )
-            await callback.bot.send_message(inviter_id, text)
+            await callback.bot.send_message(
+                inviter_id, text, parse_mode=ParseMode.MARKDOWN
+            )
 
-        # --- Referral Top N Prize Logic ---
+    # --- Referral Top N Prize Logic ---
     # Compute inviter's current rank (как в магазине)
     cur = db.conn.cursor()
     # Get current date
@@ -338,14 +347,18 @@ async def callback_check_sub(callback: types.CallbackQuery):
         if row_user_id == inviter_id:
             inviter_rank = idx
             break
-    inviter_premium = (inviter_data["premium"] if inviter_data and "premium" in inviter_data else 0)
+    inviter_premium = 0
+    if inviter_id:
+        inviter_data = db.get_user(inviter_id)
+        if inviter_data and "premium" in inviter_data:
+            inviter_premium = inviter_data["premium"]
 
     if today.day == 30:
         if inviter_rank == 1 and inviter_premium != "top1":
             try:
                 await callback.bot.send_message(
                     inviter_id,
-                    "🎉 Поздравляем! Вы заняли 1 место в рейтинге этого месяца! Напишите Павлу Думбрао (https://t.me/PavelDumbrao) в личные сообщения для получения доступа в группу."
+                    "🎉 Поздравляем! Вы заняли 1 место в рейтинге этого месяца! Напишите Павлу Думбрао (https://t.me/PavelDumbrao) в личные сообщения для получения доступа в группу.",
                 )
             except Exception:
                 pass
@@ -354,7 +367,7 @@ async def callback_check_sub(callback: types.CallbackQuery):
             try:
                 await callback.bot.send_message(
                     inviter_id,
-                    "🥈 Поздравляем! Вы заняли 2 место в рейтинге этого месяца! Напишите Павлу Думбрао (https://t.me/PavelDumbrao) в личные сообщения для получения 20% скидки на продвинутый уровень."
+                    "🥈 Поздравляем! Вы заняли 2 место в рейтинге этого месяца! Напишите Павлу Думбрао (https://t.me/PavelDumbrao) в личные сообщения для получения 20% скидки на продвинутый уровень.",
                 )
             except Exception:
                 pass
@@ -363,7 +376,7 @@ async def callback_check_sub(callback: types.CallbackQuery):
             try:
                 await callback.bot.send_message(
                     inviter_id,
-                    "🥉 Поздравляем! Вы заняли 3 место в рейтинге этого месяца! Напишите Павлу Думбрао (https://t.me/PavelDumbrao) в личные сообщения для получения 10% скидки на продвинутый уровень."
+                    "🥉 Поздравляем! Вы заняли 3 место в рейтинге этого месяца! Напишите Павлу Думбрао (https://t.me/PavelDumbrao) в личные сообщения для получения 10% скидки на продвинутый уровень.",
                 )
             except Exception:
                 pass
@@ -389,6 +402,7 @@ async def callback_check_sub(callback: types.CallbackQuery):
     )
 
     await callback.answer()  # acknowledge callback
+
 
 @router.callback_query(lambda call: call.data == "get_ref_link")
 async def callback_get_ref_link(callback: types.CallbackQuery):

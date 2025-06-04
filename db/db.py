@@ -23,10 +23,16 @@ def init_db(db_path: str = "database.db"):
             premium INTEGER DEFAULT 0,
             invited_by INTEGER,
             ref_bonus_given INTEGER DEFAULT 0,
-            challenge_progress INTEGER DEFAULT 0
+            challenge_progress INTEGER DEFAULT 0,
+            submitted_story INTEGER DEFAULT 0
         )
         """
     )
+    try:
+        cur.execute("ALTER TABLE users ADD COLUMN submitted_story INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # column already exists
+
     # Create index on invited_by for faster queries (optional)
     cur.execute("CREATE INDEX IF NOT EXISTS idx_invited_by ON users(invited_by)")
 
@@ -81,10 +87,11 @@ def add_user(
     Returns True if a new user was added, False if user already existed.
     """
     cur = conn.cursor()
-    cur.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,))
+    # Проверяем, существует ли пользователь с таким user_id
+    cur.execute("SELECT user_id, invited_by FROM users WHERE user_id = ?", (user_id,))
     row = cur.fetchone()
     if row:
-        # User exists, update username and name info just in case
+        # User exists, do not insert or update invited_by
         cur.execute(
             "UPDATE users SET username=?, first_name=?, last_name=? WHERE user_id=?",
             (username, first_name, last_name, user_id),
@@ -297,10 +304,26 @@ def get_promo_code(code: str):
     """
     return get_promo(code)
 
+
 def reset_top_statuses():
     """
     Сброс премиум статусов для топов (top1, top2, top3) в начале месяца.
     """
     cur = conn.cursor()
-    cur.execute("UPDATE users SET premium = 0 WHERE premium IN ('top1', 'top2', 'top3')")
+    cur.execute(
+        "UPDATE users SET premium = 0 WHERE premium IN ('top1', 'top2', 'top3')"
+    )
+    conn.commit()
+
+
+def has_submitted_story(user_id: int) -> bool:
+    cur = conn.cursor()
+    cur.execute("SELECT submitted_story FROM users WHERE user_id = ?", (user_id,))
+    row = cur.fetchone()
+    return row and row["submitted_story"] == 1
+
+
+def mark_story_submitted(user_id: int):
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET submitted_story = 1 WHERE user_id = ?", (user_id,))
     conn.commit()

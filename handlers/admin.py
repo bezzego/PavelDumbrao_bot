@@ -259,8 +259,15 @@ async def story_accept_callback(callback: types.CallbackQuery):
     except:
         await callback.answer("Ошибка данных", show_alert=True)
         return
+    # Check if user already submitted story
+    if db.has_submitted_story(target_id):
+        await callback.answer(
+            "Этот пользователь уже отправлял сторис.", show_alert=True
+        )
+        return
     # Award points
     db.update_points(target_id, 50)
+    db.mark_story_submitted(target_id)
     # Edit the original message in admin group to mark accepted
     try:
         new_caption = (callback.message.caption or "") + " ✅ Принято"
