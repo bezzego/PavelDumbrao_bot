@@ -309,71 +309,65 @@ async def callback_check_sub(callback: types.CallbackQuery):
             await callback.bot.send_message(inviter_id, text)
 
         # --- Referral Top N Prize Logic ---
-        # Compute inviter's current rank (as in shop handlers)
-        cur = db.conn.cursor()
-        cur.execute(
-            """
-            SELECT u.user_id, COUNT(r.user_id) AS cnt
-            FROM users u
-            LEFT JOIN users r ON r.invited_by = u.user_id
-            GROUP BY u.user_id
-            ORDER BY cnt DESC
-            """
-        )
-        all_rows = cur.fetchall()
-        inviter_rank = None
-        for idx, row in enumerate(all_rows, start=1):
-            row_user_id = (
-                row["user_id"] if isinstance(row, (dict, sqlite3.Row)) else row[0]
-            )
-            if row_user_id == inviter_id:
-                inviter_rank = idx
-                break
-        inviter_premium = (
-            inviter_data["premium"] if inviter_data and "premium" in inviter_data else 0
-        )
-        # Check and grant top prizes automatically
-        if inviter_rank == 1 and inviter_premium != True:
+    # Compute inviter's current rank (как в магазине)
+    cur = db.conn.cursor()
+    # Get current date
+    today = datetime.date.today()
+
+    if today.day == 1:
+        # Reset top statuses at start of month
+        try:
+            db.reset_top_statuses()  # Implement this function in your db module
+        except Exception:
+            pass
+
+    # Query for getting user rankings
+    cur.execute(
+        """
+        SELECT u.user_id, COUNT(r.user_id) AS cnt
+        FROM users u
+        LEFT JOIN users r ON r.invited_by = u.user_id
+        GROUP BY u.user_id
+        ORDER BY cnt DESC
+        """
+    )
+    all_rows = cur.fetchall()
+    inviter_rank = None
+    for idx, row in enumerate(all_rows, start=1):
+        row_user_id = row["user_id"] if isinstance(row, (dict, sqlite3.Row)) else row[0]
+        if row_user_id == inviter_id:
+            inviter_rank = idx
+            break
+    inviter_premium = (inviter_data["premium"] if inviter_data and "premium" in inviter_data else 0)
+
+    if today.day == 30:
+        if inviter_rank == 1 and inviter_premium != "top1":
             try:
                 await callback.bot.send_message(
                     inviter_id,
-                    "🎉 Поздравляем! Вы — ТОП-1 этого месяца и получили бесплатный переход на «Продвинутый уровень»! "
-                    "Проверьте инструкции в личных сообщениях или свяжитесь с администратором для активации.",
+                    "🎉 Поздравляем! Вы заняли 1 место в рейтинге этого месяца! Напишите Павлу Думбрао (https://t.me/PavelDumbrao) в личные сообщения для получения доступа в группу."
                 )
             except Exception:
                 pass
-            db.set_premium(inviter_id, True)
-        elif inviter_rank == 2 and inviter_premium != 2:
+            db.set_premium(inviter_id, "top1")
+        elif inviter_rank == 2 and inviter_premium != "top2":
             try:
-                # Generate a random 8-character promo code
-                code = "".join(
-                    random.choices(string.ascii_uppercase + string.digits, k=8)
-                )
-                db.add_promo_code(code, inviter_id, "TOP2")
                 await callback.bot.send_message(
                     inviter_id,
-                    "🥈 Поздравляем! Вы — ТОП-2 этого месяца и получили купон на скидку 30% на «Продвинутый уровень». \n\n"
-                    f"Ваш купон: {code} \n\n"
-                    "Используйте его при оформлении подписки в течение 7 дней.",
+                    "🥈 Поздравляем! Вы заняли 2 место в рейтинге этого месяца! Напишите Павлу Думбрао (https://t.me/PavelDumbrao) в личные сообщения для получения 20% скидки на продвинутый уровень."
                 )
             except Exception:
                 pass
-            db.set_premium(inviter_id, 2)
-        elif inviter_rank == 3 and inviter_premium != 3:
+            db.set_premium(inviter_id, "top2")
+        elif inviter_rank == 3 and inviter_premium != "top3":
             try:
-                code = "".join(
-                    random.choices(string.ascii_uppercase + string.digits, k=8)
-                )
-                db.add_promo_code(code, inviter_id, "TOP3")
                 await callback.bot.send_message(
                     inviter_id,
-                    "🥉 Поздравляем! Вы — ТОП-3 этого месяца и получили купон на скидку 30% на «Продвинутый уровень». \n\n"
-                    f"Ваш купон: {code} \n\n"
-                    "Используйте его при оформлении подписки в течение 7 дней.",
+                    "🥉 Поздравляем! Вы заняли 3 место в рейтинге этого месяца! Напишите Павлу Думбрао (https://t.me/PavelDumbrao) в личные сообщения для получения 10% скидки на продвинутый уровень."
                 )
             except Exception:
                 pass
-            db.set_premium(inviter_id, 3)
+            db.set_premium(inviter_id, "top3")
 
     # Send second greeting with photo and inline "Старт" button
     photo = FSInputFile("images/second_photo.jpg")
@@ -395,7 +389,6 @@ async def callback_check_sub(callback: types.CallbackQuery):
     )
 
     await callback.answer()  # acknowledge callback
-
 
 @router.callback_query(lambda call: call.data == "get_ref_link")
 async def callback_get_ref_link(callback: types.CallbackQuery):
