@@ -1058,7 +1058,7 @@ async def redeem_premium_points_callback(callback: types.CallbackQuery):
         db.set_premium(user_id, True)
         await callback.message.answer(
             f"🎫 Поздравляем! Вы получили доступ в закрытый канал на 1 месяц.\n\n"
-            f"Вот ссылка: {config.CLOSED_CHAT_URL}"
+            f"Напишите мне в личные сообщения для получения доступа: @PavelDumbrao"
         )
     else:
         await callback.message.answer("Недостаточно баллов для получения доступа.")
