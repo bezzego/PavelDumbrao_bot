@@ -768,23 +768,23 @@ async def handle_menu_text(message: types.Message):
 @router.callback_query(lambda c: c.data == "show_tariffs")
 async def callback_show_tariffs(callback: types.CallbackQuery):
     tariff_text = (
-        "*Тарифы на доступ в закрытый канал:*\n\n"
+        "<b>Тарифы на доступ в закрытый канал:</b>\n\n"
         "• 1 месяц — 2 490 ₽\n"
-        "• 2 месяца — 3 980 ₽\n"
-        "• 3 месяца — 5 470 ₽\n"
-        "• 12 месяцев — 14 940 ₽\n\n"
+        "• 2 месяца — 3 980 ₽ <s>4 980 ₽</s>\n"
+        "• 3 месяца — 5 470 ₽ <s>7 470 ₽</s>\n"
+        "• 12 месяцев — 14 940 ₽ <s>29 880 ₽</s>\n\n"
         "Выберите тариф для оплаты:"
     )
     kb = types.InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="1 мес – 2 490 ₽", callback_data="tariff_1")],
-            [InlineKeyboardButton(text="2 мес – 3 980 ₽", callback_data="tariff_2")],
-            [InlineKeyboardButton(text="3 мес – 5 470 ₽", callback_data="tariff_3")],
-            [InlineKeyboardButton(text="12 мес – 14 940 ₽", callback_data="tariff_12")],
+            [InlineKeyboardButton(text="2 мес — 3 980 ₽", callback_data="tariff_2")],
+            [InlineKeyboardButton(text="3 мес — 5 470 ₽", callback_data="tariff_3")],
+            [InlineKeyboardButton(text="12 мес — 14 940 ₽", callback_data="tariff_12")],
         ]
     )
     await callback.message.answer(
-        tariff_text, reply_markup=kb, parse_mode=ParseMode.MARKDOWN
+        tariff_text, reply_markup=kb, parse_mode=ParseMode.HTML
     )
     await callback.answer()
 
