@@ -244,7 +244,7 @@ async def cmd_list_users(message: types.Message):
         else:
             display_name = "—"
         text += f"• `{uid}` — {display_name} ({full_name})\n"
-    await message.reply(text, parse_mode="Markdown")
+    await message.reply(text)
 
 
 @router.callback_query(lambda c: c.data and c.data.startswith("story_accept"))
@@ -456,7 +456,7 @@ async def admin_listusers_callback(callback: types.CallbackQuery):
         else:
             display_name = "—"
         text += f"• `{uid}` — {display_name} ({full_name})\n"
-    await callback.message.answer(text, parse_mode="Markdown")
+    await callback.message.answer(text)
 
 
 @router.callback_query(lambda c: c.data == "admin_setpremium")
