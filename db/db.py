@@ -38,6 +38,11 @@ def init_db(db_path: str = "database.db"):
     except sqlite3.OperationalError:
         pass  # column already exists
 
+    try:
+        cur.execute("ALTER TABLE users ADD COLUMN banned INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # column already exists
+
     # Create index on invited_by for faster queries (optional)
     cur.execute("CREATE INDEX IF NOT EXISTS idx_invited_by ON users(invited_by)")
 
@@ -232,6 +237,43 @@ def delete_user(user_id: int):
     cur = conn.cursor()
     cur.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
     conn.commit()
+
+
+def ban_user(user_id: int) -> None:
+    """
+    Ban a user by setting the banned flag.
+    """
+    set_banned(user_id, True)
+
+
+# --- Banning and unbanning functions ---
+def set_banned(user_id: int, banned: bool) -> None:
+    """
+    Set or clear the banned flag for a user.
+    """
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE users SET banned = ? WHERE user_id = ?",
+        (1 if banned else 0, user_id),
+    )
+    conn.commit()
+
+
+def is_banned(user_id: int) -> bool:
+    """
+    Check if a user is banned.
+    """
+    cur = conn.cursor()
+    cur.execute("SELECT banned FROM users WHERE user_id = ?", (user_id,))
+    row = cur.fetchone()
+    return bool(row["banned"]) if row else False
+
+
+def unban_user(user_id: int) -> None:
+    """
+    Unban a user by clearing the banned flag.
+    """
+    set_banned(user_id, False)
 
 
 # --- New functions for lessons_files table ---

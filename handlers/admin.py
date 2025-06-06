@@ -387,7 +387,7 @@ async def cmd_ban_user(message: types.Message):
         await message.bot.send_message(message.chat.id, "Использование: /ban <user_id>")
         return
     user_id = int(parts[1])
-    db.ban_user(user_id)
+    db.set_banned(user_id, True)
     await message.bot.send_message(
         message.chat.id, f"Пользователь {user_id} заблокирован."
     )
@@ -412,7 +412,7 @@ async def cmd_unban_user(message: types.Message):
         )
         return
     user_id = int(parts[1])
-    db.unban_user(user_id)
+    db.set_banned(user_id, False)
     await message.bot.send_message(
         message.chat.id, f"Пользователь {user_id} разблокирован."
     )
