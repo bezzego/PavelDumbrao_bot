@@ -11,6 +11,7 @@ import datetime
 import calendar
 import db.db as db
 import config
+from config import CLOSED_CHAT_URL
 from keyboards import user_menu, admin_menu
 from utils.misc import check_subscription
 from handlers import lessons, referral, premium
@@ -754,7 +755,15 @@ async def cmd_access_closed(message: types.Message):
     user_id = message.from_user.id
     user_data = db.get_user(user_id)
     if user_data and user_data.get("premium"):
-        await message.answer(f"Вот ссылка на закрытый чат: {config.CLOSED_CHAT_URL}")
+        # Check for existing one-time invite link
+        invite_url = user_data.get("invite_link")
+        if not invite_url:
+            new_invite = await message.bot.create_chat_invite_link(
+                chat_id=CLOSED_CHAT_URL, member_limit=1
+            )
+            invite_url = new_invite.invite_link
+            db.set_invite_link(user_id, invite_url)
+        await message.answer(f"Вот ссылка на закрытый чат: {invite_url}")
     else:
         from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 

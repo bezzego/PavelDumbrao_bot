@@ -33,6 +33,11 @@ def init_db(db_path: str = "database.db"):
     except sqlite3.OperationalError:
         pass  # column already exists
 
+    try:
+        cur.execute("ALTER TABLE users ADD COLUMN invite_link TEXT")
+    except sqlite3.OperationalError:
+        pass  # column already exists
+
     # Create index on invited_by for faster queries (optional)
     cur.execute("CREATE INDEX IF NOT EXISTS idx_invited_by ON users(invited_by)")
 
@@ -326,4 +331,27 @@ def has_submitted_story(user_id: int) -> bool:
 def mark_story_submitted(user_id: int):
     cur = conn.cursor()
     cur.execute("UPDATE users SET submitted_story = 1 WHERE user_id = ?", (user_id,))
+    conn.commit()
+
+
+# --- Invite link functions ---
+def get_invite_link(user_id: int) -> str | None:
+    """
+    Retrieve the stored invite_link for a user if it exists.
+    """
+    cur = conn.cursor()
+    cur.execute("SELECT invite_link FROM users WHERE user_id = ?", (user_id,))
+    row = cur.fetchone()
+    return row["invite_link"] if row else None
+
+
+def set_invite_link(user_id: int, invite_link: str) -> None:
+    """
+    Store or update the one-time invite link for the given user.
+    """
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE users SET invite_link = ? WHERE user_id = ?",
+        (invite_link, user_id),
+    )
     conn.commit()

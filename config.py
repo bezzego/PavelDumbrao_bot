@@ -29,7 +29,7 @@ if not YOOMONEY_TOKEN or not YOOMONEY_WALLET:
     raise RuntimeError("YooMoney credentials not set in environment")
 
 # Premium access pricing
-PREMIUM_COST_RUB = 2500  # cost in rubles
+PREMIUM_COST_RUB = 2  # cost in rubles
 PREMIUM_COST_POINTS = 500  # cost in points
 
 # (Optional) invite link or username for closed premium group/channel
