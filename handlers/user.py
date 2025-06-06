@@ -646,7 +646,7 @@ async def cmd_closed(message: types.Message):
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text=f"💳 Оплата {config.PREMIUM_COST_RUB}₽",
+                    text=f"💳 Оплатить {config.PREMIUM_COST_RUB}₽",
                     callback_data="premium_pay",
                 ),
                 InlineKeyboardButton(
