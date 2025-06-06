@@ -28,7 +28,7 @@ router = Router()
 # --- Extra command handlers ---
 
 
-@router.message(Command("сотрудничество"))
+@router.message(Command(commands=["сотрудничество", "collaboration"]))
 async def cmd_collaboration(message: types.Message):
     from aiogram.types import FSInputFile
 
@@ -43,12 +43,12 @@ async def cmd_collaboration(message: types.Message):
     )
 
 
-@router.message(Command("поддержка"))
+@router.message(Command(commands=["поддержка", "support"]))
 async def cmd_support(message: types.Message):
     await message.answer("Для поддержки пишите сюда: https://t.me/PavelDumbrao")
 
 
-@router.message(Command("вход"))
+@router.message(Command(commands=["вход", "access_closed"]))
 async def cmd_entry_command(message: types.Message):
     # Invoke existing cmd_access_closed logic
     await cmd_access_closed(message)
