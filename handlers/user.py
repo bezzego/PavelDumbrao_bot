@@ -25,6 +25,35 @@ promo_context = {}  # user_id -> tariff_key
 router = Router()
 
 
+# --- Extra command handlers ---
+
+
+@router.message(Command("сотрудничество"))
+async def cmd_collaboration(message: types.Message):
+    from aiogram.types import FSInputFile
+
+    photo = FSInputFile("images/partner.jpg")
+    await message.answer_photo(photo=photo)
+    await message.answer(
+        "🔥 Хотите партнёрство?\n\n"
+        "– У вас продукт, связанный с AI / обучением?\n"
+        "– Вы ведёте сообщество или канал?\n"
+        "– Или хотите интеграцию в бота?\n\n"
+        "Напишите: +7 912 201 3059 WA"
+    )
+
+
+@router.message(Command("поддержка"))
+async def cmd_support(message: types.Message):
+    await message.answer("Для поддержки пишите сюда: https://t.me/PavelDumbrao")
+
+
+@router.message(Command("вход"))
+async def cmd_entry_command(message: types.Message):
+    # Invoke existing cmd_access_closed logic
+    await cmd_access_closed(message)
+
+
 @router.message(lambda m: m.text and m.text.upper().startswith("GPT"))
 async def handle_promo_code(message: types.Message):
     user_id = message.from_user.id
