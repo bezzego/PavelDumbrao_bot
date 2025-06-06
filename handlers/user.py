@@ -653,11 +653,13 @@ async def cmd_closed(message: types.Message):
                     text=f"⚡️ {config.PREMIUM_COST_POINTS} баллов",
                     callback_data="premium_points",
                 ),
+            ],
+            [
                 InlineKeyboardButton(
                     text="💸 Тарифы",
                     callback_data="show_tariffs",
                 ),
-            ]
+            ],
         ]
     )
     await message.answer(promo_text, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
