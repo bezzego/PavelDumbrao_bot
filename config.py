@@ -34,4 +34,4 @@ PREMIUM_COST_POINTS = 500  # cost in points
 
 # (Optional) invite link or username for closed premium group/channel
 CLOSED_COMMUNITY_LINK = os.getenv("CLOSED_COMMUNITY_LINK", "")
-CLOSED_CHAT_URL = os.getenv("CLOSED_CHAT_URL", "")
+CLOSED_CHAT_ID = os.getenv("CLOSED_CHAT_ID", "")
