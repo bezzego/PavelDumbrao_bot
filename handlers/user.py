@@ -58,6 +58,9 @@ async def cmd_entry_command(message: types.Message):
 @router.message(lambda m: m.photo)
 async def handle_screenshot(message: types.Message):
     """Handle user sending a screenshot of story."""
+    # Обрабатываем только личные сообщения (private chat)
+    if message.chat.type != "private":
+        return
     user = message.from_user
     user_id = user.id
     # Forward (actually copy) the photo to the review group with inline buttons
@@ -879,7 +882,9 @@ async def redeem_top1_callback(callback: types.CallbackQuery):
         user_data = db.get_user(user_id)
         invite_link = user_data.get("invite_link") if user_data else None
         if not invite_link:
-            new_invite = await callback.bot.create_chat_invite_link(chat_id=CLOSED_CHAT_ID, member_limit=1)
+            new_invite = await callback.bot.create_chat_invite_link(
+                chat_id=CLOSED_CHAT_ID, member_limit=1
+            )
             invite_link = new_invite.invite_link
             db.set_invite_link(user_id, invite_link)
         await callback.message.answer(
