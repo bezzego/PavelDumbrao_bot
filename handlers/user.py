@@ -54,94 +54,6 @@ async def cmd_entry_command(message: types.Message):
     await cmd_access_closed(message)
 
 
-@router.message(lambda m: m.text and m.text.upper().startswith("GPT"))
-async def handle_promo_code(message: types.Message):
-    user_id = message.from_user.id
-    user_data = db.get_user(user_id)
-    code = message.text.upper()
-    discounted_amount = None
-    discount_percent = None
-    label = None
-    button_text = None
-    # --- Determine tariff_key from promo_context, fallback to default ---
-    global TARIFFS
-    tariff_key = promo_context.get(user_id, "tariff_1")
-    base_amount = TARIFFS.get(tariff_key, 2490)
-
-    # First, check for a TOP2/TOP3 promo code in the DB
-    promo_record = db.get_promo(code)
-    if promo_record:
-        if promo_record["used"]:
-            await message.answer("Этот промокод уже использован.")
-            promo_context.pop(user_id, None)
-            return
-        if promo_record["user_id"] != user_id:
-            await message.answer("Этот промокод не принадлежит вам.")
-            promo_context.pop(user_id, None)
-            return
-        # Determine discount percent based on promo type
-        if promo_record["type"] in ("TOP2", "TOP3"):
-            db.set_premium(user_id, 2 if promo_record["type"] == "TOP2" else 3)
-            discount_percent = 30
-        else:
-            await message.answer("Неверный тип промокода.")
-            promo_context.pop(user_id, None)
-            return
-        discounted_amount = int(base_amount * (100 - discount_percent) / 100)
-        button_text = f"Оплатить со скидкой {discounted_amount} ₽"
-        label = generate_payment_label(user_id)
-        db.add_payment(label, user_id, discounted_amount)
-        url = await create_payment_url(discounted_amount, label)
-        kb = types.InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    types.InlineKeyboardButton(
-                        text=button_text,
-                        url=url,
-                    )
-                ]
-            ]
-        )
-        await message.answer(
-            f"Ваш промокод применён! Ваша скидка {discount_percent}% активирована.\n\n"
-            f"Для оплаты доступа по сниженной цене нажмите кнопку ниже:",
-            reply_markup=kb,
-        )
-        db.mark_promo_used(code)
-        promo_context.pop(user_id, None)
-        return
-    # Fallback to GPTDISCOUNT 10% code
-    if code == "GPTDISCOUNT":
-        db.set_premium(user_id, 2)
-        discounted_amount = int(base_amount * 0.9)
-        discount_percent = 10
-        button_text = f"Оплатить со скидкой {discounted_amount} ₽"
-        label = generate_payment_label(user_id)
-        db.add_payment(label, user_id, discounted_amount)
-        url = await create_payment_url(discounted_amount, label)
-        kb = types.InlineKeyboardMarkup(
-            inline_keyboard=[
-                [
-                    types.InlineKeyboardButton(
-                        text=button_text,
-                        url=url,
-                    )
-                ]
-            ]
-        )
-        await message.answer(
-            f"Ваш промокод применён! Ваша скидка {discount_percent}% активирована.\n\n"
-            f"Для оплаты доступа по сниженной цене нажмите кнопку ниже:",
-            reply_markup=kb,
-        )
-        promo_context.pop(user_id, None)
-        return
-    else:
-        await message.answer("Неверный промокод.")
-        promo_context.pop(user_id, None)
-        return
-
-
 @router.message(lambda m: m.photo)
 async def handle_screenshot(message: types.Message):
     """Handle user sending a screenshot of story."""
@@ -790,7 +702,7 @@ async def cmd_access_closed(message: types.Message):
         invite_url = user_data.get("invite_link")
         if not invite_url:
             new_invite = await message.bot.create_chat_invite_link(
-                chat_id=CLOSED_CHAT_URL, member_limit=1
+                chat_id=CLOSED_CHAT_ID, member_limit=1
             )
             invite_url = new_invite.invite_link
             db.set_invite_link(user_id, invite_url)
@@ -907,12 +819,6 @@ async def handle_tariff(callback: types.CallbackQuery):
                     url=url,
                 )
             ],
-            [
-                types.InlineKeyboardButton(
-                    text="🎟 У меня есть промокод",
-                    callback_data=f"promo_{tariff_key}",
-                )
-            ],
         ]
     )
     await callback.message.answer(
@@ -968,9 +874,15 @@ async def redeem_top1_callback(callback: types.CallbackQuery):
 
     if user_rank == 1:
         # Grant the free "Продвинутый уровень" and send closed chat link
+        user_data = db.get_user(user_id)
+        invite_link = user_data.get("invite_link") if user_data else None
+        if not invite_link:
+            new_invite = await callback.bot.create_chat_invite_link(chat_id=CLOSED_CHAT_ID, member_limit=1)
+            invite_link = new_invite.invite_link
+            db.set_invite_link(user_id, invite_link)
         await callback.message.answer(
             f"🎉 Поздравляем! Вы — ТОП-1 этого месяца! Вам автоматически предоставлен доступ в закрытый канал.\n\n"
-            f"Вот ссылка: {config.CLOSED_CHAT_URL}"
+            f"Вот ссылка: {invite_link}"
         )
         db.set_premium(user_id, True)
     else:
