@@ -11,7 +11,7 @@ import datetime
 import calendar
 import db.db as db
 import config
-from config import CLOSED_CHAT_URL
+from config import CLOSED_CHAT_ID
 from keyboards import user_menu, admin_menu
 from utils.misc import check_subscription
 from handlers import lessons, referral, premium
