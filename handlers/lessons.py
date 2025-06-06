@@ -620,7 +620,9 @@ async def code_word_handler(message: types.Message):
             # If that was the last lesson, award points and increment progress
             db.update_points(user_id, 40)
             db.increment_progress(user_id)
-            await message.answer("🎉 Поздравляем! Вы прошли все 7 уроков челленджа.")
+            await message.answer(
+                "🎉 Поздравляем! Вы прошли все 7 уроков челленджа. Заходите в группу для просмотра прямого эфира: https://t.me/+f_bopdhjQ8A4ZmY6"
+            )
 
     else:
         # Code word is either already used or out of order
