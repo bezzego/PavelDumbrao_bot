@@ -153,14 +153,14 @@ async def lessons_button_handler(message: types.Message):
     )
 
 
-# Handler for receiving video files and returning their file_id
-@router.message(lambda message: message.video is not None)
-async def video_receiver(message: types.Message):
-    """
-    При отправке видео боту вручную этот хэндлер вернёт file_id видео.
-    """
-    file_id = message.video.file_id
-    await message.answer(f"File_id этого видео: {file_id}")
+# # Handler for receiving video files and returning their file_id
+# @router.message(lambda message: message.video is not None)
+# async def video_receiver(message: types.Message):
+#     """
+#     При отправке видео боту вручную этот хэндлер вернёт file_id видео.
+#     """
+#     file_id = message.video.file_id
+#     await message.answer(f"File_id этого видео: {file_id}")
 
 
 CODE_WORDS = ["Brain", "Logic", "Think", "Learn", "Smart", "Profit", "Agent"]
