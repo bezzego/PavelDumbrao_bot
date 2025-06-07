@@ -40,108 +40,19 @@ async def lessons_button_handler(message: types.Message):
 
     code_index = progress
 
-    if code_index == 0:
-        lesson_text = LESSON_TEXTS[0]
-        existing_file_id = get_lesson_file_id(code_index)
-        if existing_file_id:
-            sent = await message.answer_video(video=existing_file_id)
-        else:
-            video_path = VIDEO_FILES[code_index]
-            sent = await message.answer_video(video=FSInputFile(video_path))
-            set_lesson_file_id(code_index, sent.video.file_id)
-        await message.answer(lesson_text, parse_mode="Markdown")
-    elif code_index == 1:
-        lesson_text = LESSON_TEXTS[1]
-        existing_file_id = get_lesson_file_id(code_index)
-        if existing_file_id:
-            sent = await message.answer_video(video=existing_file_id)
-        else:
-            video_path = VIDEO_FILES[code_index]
-            sent = await message.answer_video(video=FSInputFile(video_path))
-            set_lesson_file_id(code_index, sent.video.file_id)
-        await message.answer(lesson_text, parse_mode="Markdown")
-        return
-    elif code_index == 2:
-        lesson_text = LESSON_TEXTS[2]
-        existing_file_id = get_lesson_file_id(code_index)
-        if existing_file_id:
-            sent = await message.answer_video(video=existing_file_id)
-        else:
-            video_path = VIDEO_FILES[code_index]
-            sent = await message.answer_video(video=FSInputFile(video_path))
-            set_lesson_file_id(code_index, sent.video.file_id)
-        await message.answer(lesson_text, parse_mode="Markdown")
-        return
-    elif code_index == 3:
-        lesson_text = LESSON_TEXTS[3]
-        existing_file_id = get_lesson_file_id(code_index)
-        if existing_file_id:
-            sent = await message.answer_video(video=existing_file_id)
-        else:
-            video_path = VIDEO_FILES[code_index]
-            sent = await message.answer_video(video=FSInputFile(video_path))
-            set_lesson_file_id(code_index, sent.video.file_id)
-        await message.answer(lesson_text, parse_mode="Markdown")
-        return
-    elif code_index == 4:
-        lesson_text = LESSON_TEXTS[4]
-        existing_file_id = get_lesson_file_id(code_index)
-        if existing_file_id:
-            sent = await message.answer_video(video=existing_file_id)
-        else:
-            video_path = VIDEO_FILES[code_index]
-            sent = await message.answer_video(video=FSInputFile(video_path))
-            set_lesson_file_id(code_index, sent.video.file_id)
-        await message.answer(lesson_text, parse_mode="Markdown")
-        return
-    elif code_index == 5:
-        lesson_text = LESSON_TEXTS[5]
-        existing_file_id = get_lesson_file_id(code_index)
-        if existing_file_id:
-            sent = await message.answer_video(video=existing_file_id)
-        else:
-            video_path = VIDEO_FILES[code_index]
-            sent = await message.answer_video(video=FSInputFile(video_path))
-            set_lesson_file_id(code_index, sent.video.file_id)
-        await message.answer(lesson_text, parse_mode="Markdown")
-        return
-    elif code_index == 6:
-        lesson_text = LESSON_TEXTS[6]
-        existing_file_id = get_lesson_file_id(code_index)
-        if existing_file_id:
-            sent = await message.answer_video(video=existing_file_id)
-        else:
-            video_path = VIDEO_FILES[code_index]
-            sent = await message.answer_video(video=FSInputFile(video_path))
-            set_lesson_file_id(code_index, sent.video.file_id)
-        await message.answer(lesson_text, parse_mode="Markdown")
-        return
+    # Unified lesson video and text handling
+    lesson_text = LESSON_TEXTS[code_index]
+    existing_file_id = get_lesson_file_id(code_index)
+    if existing_file_id:
+        sent = await message.answer_video(video=existing_file_id)
     else:
-        lesson_text = (
-            LESSON_TEXTS[code_index] if code_index < len(LESSON_TEXTS) else "Урок..."
-        )
-        # Convert Markdown-style bold/links to HTML for the caption if needed
-        html_caption = (
-            lesson_text.replace("**", "<b>")
-            .replace("<b>", "</b>", 1)  # crude, only if needed
-            .replace("[", "")
-            .replace("]", "")  # crude, only for fallback
-        )
-        # If you want to support Markdown links in LESSON_TEXTS, use a more robust conversion.
-        existing_file_id = get_lesson_file_id(code_index)
-        if existing_file_id:
-            sent = await message.answer_video(
-                video=existing_file_id, caption=lesson_text, parse_mode="HTML"
-            )
-        else:
-            video_path = VIDEO_FILES[code_index]
-            sent = await message.answer_video(
-                video=FSInputFile(video_path),
-                caption=lesson_text,
-                parse_mode="HTML",
-            )
-            set_lesson_file_id(code_index, sent.video.file_id)
-
+        video_path = VIDEO_FILES[code_index]
+        sent = await message.answer_video(video=FSInputFile(video_path))
+        set_lesson_file_id(code_index, sent.video.file_id)
+    await message.answer(lesson_text, parse_mode="Markdown")
+    # For lessons 1 and above, return early (skip initial instructions)
+    if code_index != 0:
+        return
     await message.answer(
         "⚙️ Сделай задание, отправь промокод (СЛОВО, которое ты собрал из букв) — и забирай баллы.\n\n"
         "Всё просто: сделал → подтвердил → пошёл дальше.\n\n"
