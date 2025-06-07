@@ -2,6 +2,7 @@ from aiogram import Router, types
 import db.db as db
 import config
 from utils import yoomoney
+import logging
 
 router = Router()
 
@@ -14,11 +15,17 @@ async def premium_pay_callback(callback: types.CallbackQuery):
     if user_data and user_data.get("premium"):
         await callback.answer("У вас уже есть премиум доступ.", show_alert=True)
         return
-    # Generate payment link
-    label = yoomoney.generate_payment_label(user_id)
-    pay_url = await yoomoney.create_payment_url(config.PREMIUM_COST_RUB, label)
-    # Save pending payment in DB
-    db.add_payment(label, user_id, config.PREMIUM_COST_RUB)
+    # Generate payment link and save pending payment
+    try:
+        label = yoomoney.generate_payment_label(user_id)
+        pay_url = await yoomoney.create_payment_url(config.PREMIUM_COST_RUB, label)
+        db.add_payment(label, user_id, config.PREMIUM_COST_RUB)
+    except Exception as e:
+        logging.exception(f"Error creating payment for user {user_id}: {e}")
+        await callback.answer(
+            "Не удалось создать платёжную ссылку. Попробуйте позже.", show_alert=True
+        )
+        return
     # Acknowledge callback
     await callback.answer()
     # Send payment link to user
@@ -33,8 +40,10 @@ async def premium_pay_callback(callback: types.CallbackQuery):
     # Optionally, remove inline keyboard from the shop message to prevent duplicate clicks
     try:
         await callback.message.edit_reply_markup(reply_markup=None)
-    except:
-        pass
+    except Exception as e:
+        logging.exception(
+            f"Failed to remove reply markup for premium_pay_callback: {e}"
+        )
 
 
 @router.callback_query(lambda c: c.data == "premium_points")
@@ -51,13 +60,24 @@ async def premium_points_callback(callback: types.CallbackQuery):
         )
         return
     # Deduct points and grant premium
-    db.update_points(user_id, -config.PREMIUM_COST_POINTS)
-    db.set_premium(user_id, True)
+    try:
+        db.update_points(user_id, -config.PREMIUM_COST_POINTS)
+        db.set_premium(user_id, True)
+    except Exception as e:
+        logging.exception(
+            f"Error activating premium via points for user {user_id}: {e}"
+        )
+        await callback.answer(
+            "Ошибка при активации премиума. Попробуйте позже.", show_alert=True
+        )
+        return
     await callback.answer()
     await callback.message.answer(
-        "✅ Премиум доступ активирован! 500 баллов списано с вашего баланса."
+        f"✅ Премиум доступ активирован! {config.PREMIUM_COST_POINTS} баллов списано с вашего баланса."
     )
     try:
         await callback.message.edit_reply_markup(reply_markup=None)
-    except:
-        pass
+    except Exception as e:
+        logging.exception(
+            f"Failed to remove reply markup for premium_points_callback: {e}"
+        )
