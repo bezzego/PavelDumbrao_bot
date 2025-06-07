@@ -1,5 +1,13 @@
 import sqlite3
 
+
+def get_count(query: str, params: tuple = ()) -> int:
+    cur = conn.cursor()
+    cur.execute(query, params)
+    row = cur.fetchone()
+    return row[0] if row else 0
+
+
 # Global database connection object
 conn: sqlite3.Connection = None
 
@@ -144,12 +152,18 @@ def set_points(user_id: int, points: int):
     conn.commit()
 
 
-def set_premium(user_id: int, premium: bool):
-    """Set premium status for a user."""
+def set_premium(user_id: int, flag):
+    """
+    Set premium status for a user.
+    Supports boolean flags (True/False -> 1/0) and integer flags >=2 for permanent discounts.
+    """
     cur = conn.cursor()
-    cur.execute(
-        "UPDATE users SET premium = ? WHERE user_id = ?", (1 if premium else 0, user_id)
-    )
+    # Determine stored value: preserve integer >=2, else store 1 for truthy, 0 for falsy
+    if isinstance(flag, int) and flag >= 2:
+        value = flag
+    else:
+        value = 1 if flag else 0
+    cur.execute("UPDATE users SET premium = ? WHERE user_id = ?", (value, user_id))
     conn.commit()
 
 
@@ -183,26 +197,17 @@ def get_top_users(limit: int = 10):
 
 def get_user_count() -> int:
     """Return total number of users."""
-    cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM users")
-    count = cur.fetchone()[0]
-    return count
+    return get_count("SELECT COUNT(*) FROM users")
 
 
 def get_premium_count() -> int:
     """Return number of premium users."""
-    cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM users WHERE premium = 1")
-    count = cur.fetchone()[0]
-    return count
+    return get_count("SELECT COUNT(*) FROM users WHERE premium = 1")
 
 
 def get_referral_count() -> int:
     """Return total number of successful referrals (users who were invited by someone)."""
-    cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM users WHERE invited_by IS NOT NULL")
-    count = cur.fetchone()[0]
-    return count
+    return get_count("SELECT COUNT(*) FROM users WHERE invited_by IS NOT NULL")
 
 
 def add_payment(label: str, user_id: int, amount: int):
@@ -295,20 +300,14 @@ def set_lesson_file_id(lesson_index: int, file_id: str) -> None:
     Insert or update the file_id for a given lesson index.
     """
     cur = conn.cursor()
-    # Check if a record for this lesson_index already exists
-    existing = get_lesson_file_id(lesson_index)
-    if existing is None:
-        # Insert new record
-        cur.execute(
-            "INSERT INTO lessons_files (lesson_index, file_id) VALUES (?, ?)",
-            (lesson_index, file_id),
-        )
-    else:
-        # Update existing record
-        cur.execute(
-            "UPDATE lessons_files SET file_id = ? WHERE lesson_index = ?",
-            (file_id, lesson_index),
-        )
+    cur.execute(
+        """
+        INSERT INTO lessons_files (lesson_index, file_id)
+        VALUES (?, ?)
+        ON CONFLICT(lesson_index) DO UPDATE SET file_id = excluded.file_id
+        """,
+        (lesson_index, file_id),
+    )
     conn.commit()
 
 
@@ -357,9 +356,7 @@ def reset_top_statuses():
     Сброс премиум статусов для топов (top1, top2, top3) в начале месяца.
     """
     cur = conn.cursor()
-    cur.execute(
-        "UPDATE users SET premium = 0 WHERE premium IN ('top1', 'top2', 'top3')"
-    )
+    cur.execute("UPDATE users SET premium = 0 WHERE premium = 1")
     conn.commit()
 
 
