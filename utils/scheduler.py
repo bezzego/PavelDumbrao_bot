@@ -3,6 +3,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from datetime import datetime
 from db.db import get_pending_payments, set_payment_status, set_premium
 from utils.yoomoney import check_payment
+import logging
 
 
 async def check_payments_job(bot: Bot):
@@ -16,7 +17,8 @@ async def check_payments_job(bot: Bot):
         # Check if payment link has expired (older than 24 hours)
         try:
             created_time = datetime.fromisoformat(created_at)
-        except Exception:
+        except Exception as e:
+            logging.exception(f"Error parsing created_at '{created_at}' for label {label}: {e}")
             created_time = None
         if created_time:
             elapsed = (datetime.now() - created_time).total_seconds()
@@ -29,13 +31,14 @@ async def check_payments_job(bot: Bot):
                         user_id,
                         "❌ Ссылка на оплату истекла. Попробуйте запросить премиум заново.",
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logging.exception(f"Error sending expiration notice to user {user_id}: {e}")
                 continue
         # Check payment status via YooMoney API
         try:
             paid = await check_payment(label)
-        except Exception:
+        except Exception as e:
+            logging.exception(f"Error checking payment status for label {label}: {e}")
             paid = False
         if paid:
             # Mark as paid
@@ -47,5 +50,5 @@ async def check_payments_job(bot: Bot):
                 await bot.send_message(
                     user_id, "✅ Ваш платеж подтвержден! Премиум доступ активирован."
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logging.exception(f"Error sending premium activation notice to user {user_id}: {e}")

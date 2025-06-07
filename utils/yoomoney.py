@@ -1,5 +1,6 @@
 import aiohttp
 import config
+import logging
 import uuid
 from urllib.parse import urlencode
 
@@ -37,13 +38,18 @@ async def check_payment(label: str) -> bool:
     url = "https://yoomoney.ru/api/operation-history"
     headers = {"Authorization": f"Bearer {config.YOOMONEY_TOKEN}"}
     data = {"label": label, "records": 1}
+    logging.info(f"Starting payment check for label {label}")
     async with aiohttp.ClientSession() as session:
         try:
             async with session.post(url, headers=headers, data=data) as resp:
                 if resp.status != 200:
+                    logging.warning(
+                        f"YooMoney API returned status {resp.status} for label {label}"
+                    )
                     return False
                 result = await resp.json()
-        except Exception:
+        except Exception as e:
+            logging.exception(f"Error during check_payment for label {label}: {e}")
             return False
     # The API returns an "operations" list if successful
     operations = result.get("operations")

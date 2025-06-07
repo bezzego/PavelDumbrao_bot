@@ -11,6 +11,8 @@ import datetime
 import calendar
 import db.db as db
 import config
+import logging
+from db.db import get_count
 from config import CLOSED_CHAT_ID
 from keyboards import user_menu, admin_menu
 from utils.misc import check_subscription
@@ -77,6 +79,7 @@ async def handle_screenshot(message: types.Message):
             config.GROUP_ID, caption=caption, reply_markup=markup, parse_mode="HTML"
         )
     except Exception as e:
+        logging.exception(f"Error forwarding screenshot for user {user_id}: {e}")
         # If sending to group fails, notify user
         await message.answer(
             "Ошибка при отправке скриншота на проверку. Попробуйте позже."
@@ -125,7 +128,8 @@ async def cmd_start(message: types.Message):
             ),
             parse_mode=ParseMode.MARKDOWN,
         )
-    except Exception:
+    except Exception as e:
+        logging.exception(f"Error sending welcome photo to user {user_id}: {e}")
         # If photo sending fails, just send text
         await message.answer(
             "Привет, я Павел Думбрао.\n\n"
@@ -417,9 +421,15 @@ async def cmd_balance(message: types.Message):
         else 0
     )
     # Get referral count
-    cur = db.conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM users WHERE invited_by = ?", (user_id,))
-    referral_count = cur.fetchone()[0]
+    try:
+        referral_count = get_count(
+            "SELECT COUNT(*) FROM users WHERE invited_by = ?", (user_id,)
+        )
+    except Exception as e:
+        logging.exception(
+            f"Error fetching referral count in cmd_balance for user {user_id}: {e}"
+        )
+        referral_count = 0
     remaining = 5 - referral_count
     # Calculate lesson-based points: each lesson gives 40 points
     lesson_point = challenge_progress * 40
@@ -659,11 +669,15 @@ async def cmd_top(message: types.Message):
 @router.message(Command("gift"))
 async def cmd_gift(message: types.Message):
     user_data = db.get_user(message.from_user.id)
-    cur = db.conn.cursor()
-    cur.execute(
-        "SELECT COUNT(*) FROM users WHERE invited_by = ?", (message.from_user.id,)
-    )
-    referral_count = cur.fetchone()[0]
+    try:
+        referral_count = get_count(
+            "SELECT COUNT(*) FROM users WHERE invited_by = ?", (message.from_user.id,)
+        )
+    except Exception as e:
+        logging.exception(
+            f"Error fetching referral count in cmd_gift for user {message.from_user.id}: {e}"
+        )
+        referral_count = 0
     if referral_count < 1:
         await message.answer(
             "🎁 Подарок станет доступен после приглашения хотя бы одного друга."
@@ -760,22 +774,48 @@ async def handle_menu_text(message: types.Message):
 # Show tariff table
 @router.callback_query(lambda c: c.data == "show_tariffs")
 async def callback_show_tariffs(callback: types.CallbackQuery):
-    tariff_text = (
-        "<b>Тарифы на доступ в закрытый канал:</b>\n\n"
-        "• 1 месяц — 2 490 ₽\n"
-        "• 2 месяца — 3 980 ₽ <s>4 980 ₽</s>\n"
-        "• 3 месяца — 5 470 ₽ <s>7 470 ₽</s>\n"
-        "• 12 месяцев — 14 940 ₽ <s>29 880 ₽</s>\n\n"
-        "Выберите тариф для оплаты:"
-    )
-    kb = types.InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="1 мес – 2 490 ₽", callback_data="tariff_1")],
-            [InlineKeyboardButton(text="2 мес — 3 980 ₽", callback_data="tariff_2")],
-            [InlineKeyboardButton(text="3 мес — 5 470 ₽", callback_data="tariff_3")],
-            [InlineKeyboardButton(text="12 мес — 14 940 ₽", callback_data="tariff_12")],
-        ]
-    )
+    # Build dynamic tariff list with 10% discount for flagged users
+    user_id = callback.from_user.id
+    user_data = db.get_user(user_id)
+    # Determine if user has permanent discount (flag >=2)
+    premium_flag = user_data.get("premium", 0) if user_data else 0
+    try:
+        premium_flag = int(premium_flag)
+    except (TypeError, ValueError):
+        premium_flag = 0
+    discount = premium_flag >= 2
+
+    # Base prices
+    prices = [2490, 3980, 5470, 14940]
+    # Apply discount if needed
+    discounted = [int(p * 0.9) for p in prices] if discount else prices
+
+    tariff_text = "<b>Тарифы на доступ в закрытый канал:</b>\n\n"
+    for idx, orig in enumerate(prices, start=1):
+        if discount:
+            disc = discounted[idx - 1]
+            tariff_text += f"• {idx} мес — {disc:,} ₽ <s>{orig:,} ₽</s>\n"
+        else:
+            if idx == 1:
+                tariff_text += f"• 1 мес — {orig:,} ₽\n"
+            else:
+                tariff_text += (
+                    f"• {idx} мес — {orig:,} ₽ <s>{prices[idx-2] * idx} ₽</s>\n"
+                )
+    tariff_text += "\nВыберите тариф для оплаты:"
+
+    # Build keyboard buttons dynamically based on discounted prices
+    buttons = []
+    for idx, price in enumerate(discounted, start=1):
+        price_str = f"{price:,}".replace(",", " ")
+        buttons.append(
+            [
+                InlineKeyboardButton(
+                    text=f"{idx} мес — {price_str} ₽", callback_data=f"tariff_{idx}"
+                )
+            ]
+        )
+    kb = types.InlineKeyboardMarkup(inline_keyboard=buttons)
     await callback.message.answer(
         tariff_text, reply_markup=kb, parse_mode=ParseMode.HTML
     )
@@ -799,6 +839,15 @@ async def handle_tariff(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     tariff_key = callback.data  # e.g., "tariff_1"
     amount = TARIFFS.get(tariff_key)
+    # Apply 10% discount if the user has permanent discount flag
+    user_data = db.get_user(user_id)
+    premium_flag = user_data.get("premium", 0) if user_data else 0
+    try:
+        premium_flag = int(premium_flag)
+    except (TypeError, ValueError):
+        premium_flag = 0
+    if premium_flag >= 2:
+        amount = int(amount * 0.9)
     if not amount:
         await callback.answer("Выбран неверный тариф.", show_alert=True)
         return
@@ -1021,12 +1070,11 @@ async def redeem_discount_points_callback(callback: types.CallbackQuery):
     user_data = db.get_user(user_id)
     if user_data and user_data.get("points", 0) >= 500:
         db.update_points(user_id, -500)
-        # Mark in DB as having received a discount coupon (use premium=2)
+        # Mark user as having a permanent 10% discount
         db.set_premium(user_id, 2)
         await callback.message.answer(
-            "🔒 Поздравляем! Вы получили постоянную скидку 10% на подписку.\n\n"
-            "Ваш купон: GPTDISCOUNT\n\n"
-            "Используйте этот купон при оплате подписки."
+            "🔒 Поздравляем! Ваша постоянная скидка 10% активирована. "
+            "Теперь все тарифы будут автоматически уменьшаться на 10%."
         )
     else:
         await callback.message.answer("Недостаточно баллов для получения скидки.")
