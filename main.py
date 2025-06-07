@@ -6,6 +6,11 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from handlers import user, lessons, referral, premium, admin
 from utils.scheduler import check_payments_job
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+import logging
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 
 
 async def main():
@@ -25,9 +30,16 @@ async def main():
     scheduler = AsyncIOScheduler()
     # Check YooMoney payments every 60 seconds
     scheduler.add_job(check_payments_job, "interval", seconds=60, args=(bot,))
-    scheduler.start()
-    # Start polling
-    await dp.start_polling(bot, skip_updates=True)
+    try:
+        scheduler.start()
+        logging.info("Scheduler started, beginning polling")
+        await dp.start_polling(bot, skip_updates=True)
+    except Exception as e:
+        logging.exception(f"Error in main polling loop: {e}")
+    finally:
+        logging.info("Shutting down: closing bot session and scheduler")
+        await bot.session.close()
+        scheduler.shutdown()
 
 
 if __name__ == "__main__":
