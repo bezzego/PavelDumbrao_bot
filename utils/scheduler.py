@@ -18,21 +18,15 @@ async def check_payments_job(bot: Bot):
         try:
             created_time = datetime.fromisoformat(created_at)
         except Exception as e:
-            logging.exception(f"Error parsing created_at '{created_at}' for label {label}: {e}")
+            logging.exception(
+                f"Error parsing created_at '{created_at}' for label {label}: {e}"
+            )
             created_time = None
         if created_time:
             elapsed = (datetime.now() - created_time).total_seconds()
             if elapsed > 24 * 3600:
                 # Mark as expired
                 set_payment_status(label, "expired")
-                # Optionally, notify user (not mandatory)
-                try:
-                    await bot.send_message(
-                        user_id,
-                        "❌ Ссылка на оплату истекла. Попробуйте запросить премиум заново.",
-                    )
-                except Exception as e:
-                    logging.exception(f"Error sending expiration notice to user {user_id}: {e}")
                 continue
         # Check payment status via YooMoney API
         try:
@@ -51,4 +45,6 @@ async def check_payments_job(bot: Bot):
                     user_id, "✅ Ваш платеж подтвержден! Премиум доступ активирован."
                 )
             except Exception as e:
-                logging.exception(f"Error sending premium activation notice to user {user_id}: {e}")
+                logging.exception(
+                    f"Error sending premium activation notice to user {user_id}: {e}"
+                )
