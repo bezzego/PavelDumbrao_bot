@@ -219,7 +219,7 @@ async def callback_check_sub(callback: types.CallbackQuery):
                 caption = (
                     "🎉 Ты пригласил первого друга!\n"
                     "+50 баллов на счёт.\n\n"
-                    "Держи бонус: [📥 Скачать PDF]\n"
+                    "Держи бонус: https://t.me/AiProducerAssist_bot\n"
                     "Осталось ещё 4 до бесплатного входа в AI-клуб.\n"
                 )
                 await callback.bot.send_photo(
@@ -234,19 +234,8 @@ async def callback_check_sub(callback: types.CallbackQuery):
                     inviter_id,
                     "🎉 Ты пригласил первого друга!\n"
                     "+50 баллов на счёт.\n\n"
-                    "Держи бонус: [📥 Скачать PDF]\n"
+                    "Держи бонус: https://t.me/AiProducerAssist_bot\n"
                     "Осталось ещё 4 до бесплатного входа в AI-клуб.",
-                )
-            # Send the PDF bonus as document
-            try:
-                doc = FSInputFile("gift.pdf")
-                await callback.bot.send_document(
-                    inviter_id, document=doc, caption="📥 Скачать PDF"
-                )
-            except Exception:
-                await callback.bot.send_message(
-                    inviter_id,
-                    "Не удалось отправить PDF-бонус. Обратитесь к администратору.",
                 )
         else:
             # Subsequent invite message
@@ -683,22 +672,16 @@ async def cmd_gift(message: types.Message):
             "🎁 Подарок станет доступен после приглашения хотя бы одного друга."
         )
     else:
-        # Send the gift image before sending the PDF
+        # Send the gift image before sending the gift message
         try:
             photo = FSInputFile("images/gift.jpg")
             await message.answer_photo(photo=photo)
         except Exception:
             pass
-        # Send the gift PDF file
         try:
-            doc = FSInputFile("gift.pdf")
-            await message.answer_document(
-                document=doc, caption="🎁 Ваш подарок - PDF файл."
-            )
-        except Exception as e:
-            await message.answer(
-                "Не удалось отправить подарок. Обратитесь к администратору."
-            )
+            await message.answer("🎁 Ваш подарок: https://t.me/AiProducerAssist_bot")
+        except Exception:
+            await message.answer("🎁 Ваш подарок: https://t.me/AiProducerAssist_bot")
 
 
 @router.message(lambda m: m.text and m.text.lower() in ["вход", "/вход"])
