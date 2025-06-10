@@ -697,7 +697,9 @@ async def cmd_access_closed(message: types.Message):
             )
             invite_url = new_invite.invite_link
             db.set_invite_link(user_id, invite_url)
-        await message.answer(f"Вот ссылка на закрытый чат: {invite_url}")
+        await message.answer(
+            f"Вот ссылка на закрытый чат: пока пусто. Пишите сюда: @PavelDumbrao"
+        )
     else:
         from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
