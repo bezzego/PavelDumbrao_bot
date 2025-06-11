@@ -146,47 +146,33 @@ async def process_broadcast_message(message: types.Message, state: FSMContext):
 
 
 @admin_only
-@router.callback_query(lambda c: c.data == "admin_send_pdf")
-async def admin_send_pdf_callback(callback: types.CallbackQuery):
+@router.callback_query(lambda c: c.data == "admin_show_top")
+async def admin_show_top_callback(callback: types.CallbackQuery):
     await callback.answer()
-    # Get all user IDs
-    cur = db.conn.cursor()
-    cur.execute("SELECT user_id FROM users")
-    users = [row[0] for row in cur.fetchall()]
-    if not users:
-        await callback.message.answer("Нет пользователей для отправки PDF.")
+    # Получаем ТОП-10 по баллам
+    top = db.get_top_users(limit=10)  # [(user_id, username, first_name, points), ...]
+    if not top:
+        await callback.message.answer("🏆 Топ пользователей пуст.")
         return
-    await callback.message.answer(
-        f"⌛ Отправка PDF файла {len(users)} пользователям..."
-    )
-    success = 0
-    fail = 0
-    from aiogram.types import FSInputFile
 
-    doc = FSInputFile("gift.pdf")
-    for i, uid in enumerate(users):
-        try:
-            await callback.message.chat.bot.send_document(uid, doc)
-            success += 1
-        except exceptions.TelegramForbiddenError:
-            fail += 1
-            db.delete_user(uid)
-        except exceptions.TelegramFloodWait as e:
-            await asyncio.sleep(e.retry_after)
-            try:
-                await callback.message.chat.bot.send_document(uid, doc)
-                success += 1
-            except Exception as e:
-                logging.exception(f"Failed to send PDF to {uid}: {e}")
-                fail += 1
-        except Exception as e:
-            logging.exception(f"Failed to send PDF to {uid}: {e}")
-            fail += 1
-        if i % 10 == 9:
-            await asyncio.sleep(1)
-    await callback.message.answer(
-        f"✅ PDF отправлен. Успешно: {success}, не удалось: {fail}."
-    )
+    text = "🏆 <b>ТОП Пользователей</b>\n\n"
+    for rank, (uid, uname, first, pts) in enumerate(top, start=1):
+        # Считаем приглашения
+        cur = db.conn.cursor()
+        cur.execute("SELECT COUNT(*) FROM users WHERE invited_by = ?", (uid,))
+        ref_cnt = cur.fetchone()[0] or 0
+        # Статус премиума
+        premium = "✅" if db.get_user(uid).get("premium") else "❌"
+        # Отображение
+        full_name = first or "—"
+        usertag = f"@{uname}" if uname else "—"
+        text += (
+            f"{rank}. <code>{uid}</code> {usertag} ({full_name})\n"
+            f"   • Баллы: <b>{pts}</b> | Приглашений: <b>{ref_cnt}</b> | Премиум: {premium}\n"
+        )
+
+    text += "\n🔁 Рейтинг обновляется ежемесячно."
+    await callback.message.answer(text, parse_mode="HTML")
 
 
 @admin_only
