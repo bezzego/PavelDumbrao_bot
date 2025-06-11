@@ -1077,3 +1077,60 @@ async def redeem_consultation_points_callback(callback: types.CallbackQuery):
     else:
         await callback.message.answer("Недостаточно баллов для получения консультации.")
     await callback.answer()
+
+
+# ----------------------------------------------------------------------
+# Функция для рассылки рейтинга всем юзерам 10-го, 20-го и 30-го числа
+async def send_monthly_top(bot: types.Bot):
+    """
+    Собирает топ-10 пригласивших пользователей и рассылает всем пользователям.
+    В конце добавляет пометку об обнулении 30 числа текущего месяца.
+    """
+    cur = db.conn.cursor()
+    cur.execute(
+        """
+        SELECT u.user_id, COUNT(r.user_id) AS cnt
+        FROM users u
+        LEFT JOIN users r ON r.invited_by = u.user_id
+        GROUP BY u.user_id
+        ORDER BY cnt DESC
+        LIMIT 10
+        """
+    )
+    rows = cur.fetchall()
+
+    lines = ["🏆 Рейтинг за месяц:\n"]
+    if not rows:
+        lines.append("Нет приглашений.")
+    else:
+        for idx, row in enumerate(rows, start=1):
+            user_id_val = (
+                row["user_id"] if isinstance(row, (dict, sqlite3.Row)) else row[0]
+            )
+            cnt = row["cnt"] if isinstance(row, (dict, sqlite3.Row)) else row[1]
+            user_data = db.get_user(user_id_val)
+            if user_data and user_data.get("username"):
+                name = f"@{user_data['username']}"
+            else:
+                name = user_data.get("first_name") or str(user_id_val)
+            lines.append(f"{idx}. {name} — {cnt} приглашений")
+    lines.append("\n🔁 Обнуление рейтинга произойдёт 30 числа этого месяца.")
+    caption = "\n".join(lines)
+
+    cur2 = db.conn.cursor()
+    cur2.execute("SELECT user_id FROM users")
+    all_users = [r[0] for r in cur2.fetchall()]
+
+    for uid in all_users:
+        try:
+            await bot.send_photo(
+                chat_id=uid,
+                photo=FSInputFile("images/top.jpg"),
+                caption=caption,
+                parse_mode=ParseMode.MARKDOWN,
+            )
+        except Exception as e:
+            logging.exception(f"Не удалось отправить рейтинг пользователю {uid}: {e}")
+
+
+# ----------------------------------------------------------------------
