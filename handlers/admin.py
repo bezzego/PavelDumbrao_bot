@@ -149,7 +149,7 @@ async def process_broadcast_message(message: types.Message, state: FSMContext):
 @router.callback_query(lambda c: c.data == "admin_show_top")
 async def admin_show_top_callback(callback: types.CallbackQuery):
     await callback.answer()
-    # Получаем ТОП-10 по баллам
+    # Получаем ТОП-10000 по баллам
     top = db.get_top_users(
         limit=10000
     )  # [(user_id, username, first_name, points), ...]
