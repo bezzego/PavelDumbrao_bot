@@ -9,7 +9,7 @@ admin_menu = InlineKeyboardMarkup(
             InlineKeyboardButton(text="Рассылка", callback_data="admin_broadcast"),
         ],
         [
-            InlineKeyboardButton(text="PDF подарок", callback_data="admin_send_pdf"),
+            InlineKeyboardButton(text="Показать ТОПОВ", callback_data="admin_show_top"),
             InlineKeyboardButton(text="Сброс топа", callback_data="admin_reset_top"),
         ],
         [InlineKeyboardButton(text="Экспорт CSV", callback_data="admin_export_csv")],
