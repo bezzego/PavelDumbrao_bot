@@ -410,15 +410,17 @@ async def cmd_balance(message: types.Message):
         else 0
     )
     # Get referral count
-    try:
-        referral_count = get_count(
-            "SELECT COUNT(*) FROM users WHERE invited_by = ?", (user_id,)
-        )
-    except Exception as e:
-        logging.exception(
-            f"Error fetching referral count in cmd_balance for user {user_id}: {e}"
-        )
-        referral_count = 0
+    referral_count = user_data.get("referral_count") if user_data else 0
+    if referral_count is None:
+        try:
+            referral_count = get_count(
+                "SELECT COUNT(*) FROM users WHERE invited_by = ?", (user_id,)
+            )
+        except Exception as e:
+            logging.exception(
+                f"Error fetching referral count in cmd_balance for user {user_id}: {e}"
+            )
+            referral_count = 0
     remaining = 5 - referral_count
     # Calculate lesson-based points: each lesson gives 40 points
     lesson_point = challenge_progress * 40
@@ -634,11 +636,18 @@ async def cmd_top(message: types.Message):
                 if isinstance(row, dict) or hasattr(row, "keys")
                 else row[0]
             )
+            # Use stored referral_count if available, otherwise fallback to query count
+            user_data = db.get_user(user_id_val)
             count = (
-                row["cnt"] if isinstance(row, dict) or hasattr(row, "keys") else row[3]
+                user_data.get("referral_count")
+                if user_data and user_data.get("referral_count") is not None
+                else (
+                    row["cnt"]
+                    if isinstance(row, dict) or hasattr(row, "keys")
+                    else row[3]
+                )
             )
             # Get display name
-            user_data = db.get_user(user_id_val)
             if user_data:
                 name = (
                     f"@{user_data['username']}"
