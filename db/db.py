@@ -51,6 +51,11 @@ def init_db(db_path: str = "database.db"):
     except sqlite3.OperationalError:
         pass  # column already exists
 
+    try:
+        cur.execute("ALTER TABLE users ADD COLUMN referral_count INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass  # column already exists
+
     # Create index on invited_by for faster queries (optional)
     cur.execute("CREATE INDEX IF NOT EXISTS idx_invited_by ON users(invited_by)")
 
@@ -392,5 +397,16 @@ def set_invite_link(user_id: int, invite_link: str) -> None:
     cur.execute(
         "UPDATE users SET invite_link = ? WHERE user_id = ?",
         (invite_link, user_id),
+    )
+    conn.commit()
+
+
+def set_referral_count(user_id: int, count: int):
+    """
+    Устанавливает количество приглашенных пользователей (рефералов) у заданного пользователя.
+    """
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE users SET referral_count = ? WHERE user_id = ?", (count, user_id)
     )
     conn.commit()
