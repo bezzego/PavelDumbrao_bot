@@ -157,12 +157,15 @@ async def admin_show_top_callback(callback: types.CallbackQuery):
 
     text = "🏆 <b>ТОП Пользователей</b>\n\n"
     for rank, (uid, uname, first, pts) in enumerate(top, start=1):
-        # Считаем приглашения
-        cur = db.conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM users WHERE invited_by = ?", (uid,))
-        ref_cnt = cur.fetchone()[0] or 0
+        # Гибридный способ получения количества приглашений
+        user_data = db.get_user(uid)
+        ref_cnt = user_data.get("referral_count") if user_data else 0
+        if ref_cnt is None:
+            cur = db.conn.cursor()
+            cur.execute("SELECT COUNT(*) FROM users WHERE invited_by = ?", (uid,))
+            ref_cnt = cur.fetchone()[0] or 0
         # Статус премиума
-        premium = "✅" if db.get_user(uid).get("premium") else "❌"
+        premium = "✅" if user_data and user_data.get("premium") else "❌"
         # Отображение
         full_name = first or "—"
         usertag = f"@{uname}" if uname else "—"
@@ -484,11 +487,31 @@ async def admin_ban_callback(callback: types.CallbackQuery):
     )
 
 
+# Set referrals count for a user (admin only)
 @admin_only
-@router.callback_query(lambda c: c.data == "admin_unban")
-async def admin_unban_callback(callback: types.CallbackQuery):
+@router.message(Command("setreferrals"))
+async def cmd_set_referrals(message: types.Message):
+    args = parse_command_args(message, 2)
+    if not args or not args[0].isdigit() or not args[1].isdigit():
+        await message.bot.send_message(
+            message.chat.id, "Использование: /setreferrals <user_id> <ref_count>"
+        )
+        return
+    user_id = int(args[0])
+    ref_count = int(args[1])
+    db.set_referral_count(user_id, ref_count)
+    await message.bot.send_message(
+        message.chat.id,
+        f"Количество приглашений пользователя {user_id} установлено в {ref_count}.",
+    )
+
+
+# Callback handler for "Приглашения" button in admin menu
+@admin_only
+@router.callback_query(lambda c: c.data == "setreferrals")
+async def admin_setreferrals_callback(callback: types.CallbackQuery):
     await callback.answer()
     await callback.message.answer(
-        "Используйте команду `/unban <user_id>` для разблокировки пользователя.",
+        "Используйте команду `/setreferrals <user_id> <ref_count>` для установки количества приглашений.",
         parse_mode="Markdown",
     )
