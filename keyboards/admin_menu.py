@@ -29,6 +29,7 @@ admin_menu = InlineKeyboardMarkup(
             InlineKeyboardButton(text="Заблокировать", callback_data="admin_ban"),
         ],
         [
+            InlineKeyboardButton(text="Приглашения", callback_data="admin_setinvites"),
             InlineKeyboardButton(text="Разблокировать", callback_data="admin_unban"),
         ],
         [InlineKeyboardButton(text="Выйти", callback_data="admin_exit")],
